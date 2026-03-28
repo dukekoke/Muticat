@@ -61,6 +61,13 @@
       50% { transform: translateX(-50%) scale(1.2); opacity: 1; }
       100% { transform: translateX(-50%) scale(1); opacity: 0; }
     }
+	
+	#resultImage {
+    width: 50vw;   /* 寬度填滿整個視窗 */
+    height: 50vh;  /* 高度填滿整個視窗 */
+    object-fit: cover; /* 保持比例並裁切填滿 */
+	}
+
     /* 答案選項按鈕樣式 */
     #options button {
       font-size: 24px;
@@ -78,8 +85,29 @@
       background-color: #666;
     }
 
+	#enemyBase, #playerBase {
+	position: absolute;
+	transition: transform 0.5s ease; /* 平滑移動 */
+	}
 
-    
+	#enemyBase {
+	left: 25%; /* 初始在左邊 25% */
+	}
+
+	#playerBase {
+	right: 25%; /* 初始在右邊 25% */
+	}
+
+
+
+
+
+
+
+
+
+
+
   </style>
 </head>
 <body>
@@ -133,7 +161,7 @@
     <ol id="scores"></ol>
   </div>
 
-  
+
 <script>
   let playerHP = 100, enemyHP = 100;
   let playerRole = "";
@@ -172,8 +200,8 @@
   // 角色逐漸靠近畫面中心
   function moveCharacters() {
     // 玩家從右往左移動（負方向），敵人從左往右移動（正方向）
-    playerShift -= 30;   
-    enemyShift += 30;    
+    playerShift -= 10;   
+    enemyShift += 10;    
 
     document.getElementById("playerBase").style.transform = `translateX(${playerShift}px)`;
     document.getElementById("enemyBase").style.transform = `translateX(${enemyShift}px)`;
