@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>🔥 正派 vs 伊邪那美</title>
+  <style>
+    body {
+      font-family: "Microsoft JhengHei", sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+    }
+    #game { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+    .base { width: 200px; text-align: center; transition: transform 0.5s ease; position: relative; }
+    .character { width: 150px; height: auto; }
+    #battlefield, #previewArea { flex-grow: 1; text-align: center; height: 200px; margin-top: 20px; }
+    .hpBar { width: 150px; height: 20px; background: #ccc; border: 2px solid #333; margin: 5px auto; border-radius: 5px; }
+    .hpFill { height: 100%; width: 100%; background: linear-gradient(to right, #ff0000, #ff8800); border-radius: 5px; transition: width 0.5s ease; }
+    .lowHP { animation: lowHpFlash 1s infinite; color: red; font-weight: bold; }
+    @keyframes lowHpFlash { 
+      0% { background: linear-gradient(to right, #ff0000, #ff8800);} 
+      50% { background: linear-gradient(to right, #990000, #ff0000);} 
+      100% { background: linear-gradient(to right, #ff0000, #ff8800);} 
+    }
+    #resultScreen { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:999; }
+    #resultContent { text-align:center; color:white; }
+    #resultText { font-size:32px; margin-top:20px; animation: resultFlash 1s infinite; }
+    @keyframes resultFlash { 0%{color:yellow;} 50%{color:red;} 100%{color:yellow;} }
+    #scores li { display:flex; align-items:center; margin:5px 0; padding:5px; border-radius:8px; }
+    .scoreIcon { width:40px; height:40px; margin-right:10px; border-radius:50%; border:2px solid #fff; }
+    .gold { border:2px solid gold; background:rgba(255,215,0,0.2); }
+    .silver { border:2px solid silver; background:rgba(192,192,192,0.2); }
+    .bronze { border:2px solid #cd7f32; background:rgba(205,127,50,0.2); }
+
+    /* 光影環繞特效 */
+    .glowEffect {
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: glowPulse 1s ease-out;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .fireGlow {
+      box-shadow: 0 0 30px 15px rgba(255, 80, 0, 0.9);
+      background: radial-gradient(rgba(255,80,0,0.6), transparent);
+    }
+    .lightningGlow {
+      box-shadow: 0 0 40px 20px rgba(255, 255, 0, 0.9);
+      background: radial-gradient(rgba(255,255,0,0.6), transparent);
+    }
+    .explosionGlow {
+      box-shadow: 0 0 50px 25px rgba(255, 140, 0, 1);
+      background: radial-gradient(rgba(255,140,0,0.7), transparent);
+    }
+    @keyframes glowPulse {
+      0% { transform: translateX(-50%) scale(0.8); opacity: 0.8; }
+      50% { transform: translateX(-50%) scale(1.2); opacity: 1; }
+      100% { transform: translateX(-50%) scale(1); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔥 正派 vs 伊邪那美</h1>
+
+  <!-- 角色選擇介面 -->
+  <div id="characterSelect">
+    <label>選擇你的角色：</label>
+    <select id="playerSelect" onchange="previewEffect()">
+      <option value="炭志郎">炭志郎</option>
+      <option value="善溢">善溢</option>
+      <option value="煉獄杏壽郎">煉獄杏壽郎</option>
+    </select>
+    <button onclick="startGame()">開始遊戲</button>
+  </div>
+
+  <!-- 預覽區域 -->
+  <div id="previewArea"></div>
+
+  <!-- 遊戲區域 -->
+  <div id="game" style="display:none;">
+    <div class="base" id="enemyBase">
+      <img src="images/characters/izanami.png" alt="伊邪那美" class="character">
+      <div class="hpBar"><div id="enemyHPBar" class="hpFill"></div></div>
+      <p id="enemyHPText">伊邪那美 ❤️100</p>
+    </div>
+    <div id="battlefield"></div>
+    <div class="base" id="playerBase">
+      <img src="" alt="玩家角色" class="character" id="playerCharacter">
+      <div class="hpBar"><div id="playerHPBar" class="hpFill"></div></div>
+      <p id="playerHPText">玩家 ❤️100</p>
+    </div>
+  </div>
+
+  <!-- 結算畫面 -->
+  <div id="resultScreen" style="display:none;">
+    <div id="resultContent">
+      <img id="resultImage" src="" alt="結算角色" class="character">
+      <h2 id="resultText"></h2>
+    </div>
+  </div>
+
+  <!-- 排行榜（預設隱藏） -->
+  <div id="leaderboard" style="display:none;">
+    <h2>🏆 排行榜</h2>
+    <ol id="scores"></ol>
+  </div>
+
+  <!-- 題目區域 -->
+  <div id="quizArea" style="margin-top:20px;">
+    <h2>📝 數學挑戰</h2>
+    <p id="questionText"></p>
+    <div id="options"></div>
+  </div>
+<script>
+  let playerHP = 100, enemyHP = 100;
+  let playerRole = "";
+  let startTime = 0;
+  let playerShift = 0;
+  let enemyShift = 0;
+
+  // 預覽角色特效
+  function previewEffect() {
+    let role = document.getElementById("playerSelect").value;
+    let preview = document.getElementById("previewArea");
+    preview.innerHTML = "";
+    let effect = document.createElement("div");
+    effect.className = "glowEffect";
+    if(role === "炭志郎") effect.classList.add("fireGlow");
+    else if(role === "善溢") effect.classList.add("lightningGlow");
+    else if(role === "煉獄杏壽郎") effect.classList.add("explosionGlow");
+    preview.appendChild(effect);
+    setTimeout(() => effect.remove(), 1000);
+  }
+
+  // 開始遊戲
+  function startGame() {
+    playerRole = document.getElementById("playerSelect").value;
+    document.getElementById("game").style.display = "flex";
+    document.getElementById("leaderboard").style.display = "none"; // 遊戲開始隱藏排行榜
+    startTime = Date.now();
+    let playerImg = document.getElementById("playerCharacter");
+    if(playerRole === "炭志郎") playerImg.src = "images/characters/tanjiro.png";
+    else if(playerRole === "善溢") playerImg.src = "images/characters/zenitsu.png";
+    else if(playerRole === "煉獄杏壽郎") playerImg.src = "images/characters/rengoku.png";
+    updateHP();
+    generateQuestion(); // 遊戲開始時出題
+  }
+
+  // 角色逐漸靠近畫面中心
+  function moveCharacters() {
+    // 玩家從右往左移動（負方向），敵人從左往右移動（正方向）
+    playerShift -= 30;   
+    enemyShift += 30;    
+
+    document.getElementById("playerBase").style.transform = `translateX(${playerShift}px)`;
+    document.getElementById("enemyBase").style.transform = `translateX(${enemyShift}px)`;
+  }
+
+  // 更新血量顯示
+  function updateHP() {
+    let playerText = document.getElementById("playerHPText");
+    let enemyText = document.getElementById("enemyHPText");
+    playerText.innerText = `玩家 ❤️${playerHP}`;
+    enemyText.innerText = `伊邪那美 ❤️${enemyHP}`;
+    let playerBar = document.getElementById("playerHPBar");
+    let enemyBar = document.getElementById("enemyHPBar");
+    playerBar.style.width = playerHP + "%";
+    enemyBar.style.width = enemyHP + "%";
+    if(playerHP <= 30) { playerBar.classList.add("lowHP"); playerText.classList.add("lowHP"); }
+    else { playerBar.classList.remove("lowHP"); playerText.classList.remove("lowHP"); }
+    if(enemyHP <= 30) { enemyBar.classList.add("lowHP"); enemyText.classList.add("lowHP"); }
+    else { enemyBar.classList.remove("lowHP"); enemyText.classList.remove("lowHP"); }
+  }
+
+  // 玩家攻擊
+  function playerAttack() {
+    triggerEffect(playerRole, "playerBase");
+    enemyHP -= 20;
+    if(enemyHP < 0) enemyHP = 0;
+    updateHP();
+    moveCharacters(); // 攻擊後往中心移動
+    if(enemyHP === 0) endGame(true);
+  }
+
+  // 敵人攻擊
+  function enemyAttack() {
+    triggerEffect("伊邪那美", "enemyBase");
+    playerHP -= 20;
+    if(playerHP < 0) playerHP = 0;
+    updateHP();
+    moveCharacters(); // 攻擊後往中心移動
+    if(playerHP === 0) endGame(false);
+  }
+
+  // 遊戲結束
+  function endGame(win) {
+    let resultScreen = document.getElementById("resultScreen");
+    let resultImage = document.getElementById("resultImage");
+    let resultText = document.getElementById("resultText");
+    resultScreen.style.display = "flex";
+    let timeTaken = Math.floor((Date.now() - startTime)/1000);
+    if(win) {
+      resultImage.src = "images/results/playerVictory.png";
+      resultText.innerText = `🎉 勝利！${playerRole} 打敗了伊邪那美！`;
+      saveScore(true, timeTaken, playerRole);
+    } else {
+      resultImage.src = "images/results/enemyVictory.png";
+      resultText.innerText = "💀 失敗！伊邪那美吞噬了你！";
+      saveScore(false, timeTaken, playerRole);
+    }
+    setTimeout(() => { 
+      resultScreen.style.display = "none"; 
+      resetGame(); 
+      document.getElementById("leaderboard").style.display = "block"; 
+      showLeaderboard(); 
+    }, 3000);
+  }
+
+  // 重置遊戲
+  function resetGame() {
+    playerHP = 100; enemyHP = 100;
+    playerShift = 0; enemyShift = 0;
+    updateHP();
+    document.getElementById("battlefield").innerHTML = "";
+    document.getElementById("playerBase").style.transform = "translateX(0)";
+    document.getElementById("enemyBase").style.transform = "translateX(0)";
+  }
+</script>
+
+
+<script>
+  // 聲光特效觸發
+  function triggerEffect(role, targetId) {
+    let target = document.getElementById(targetId);
+    let effect = document.createElement("div");
+    effect.className = "glowEffect";
+
+    if(role === "炭志郎") {
+      effect.classList.add("fireGlow");
+      new Audio("sounds/fire_slash.mp3").play();
+    } else if(role === "善溢") {
+      effect.classList.add("lightningGlow");
+      new Audio("sounds/lightning_strike.mp3").play();
+    } else if(role === "煉獄杏壽郎") {
+      effect.classList.add("explosionGlow");
+      new Audio("sounds/explosion.mp3").play();
+    } else if(role === "伊邪那美") {
+      effect.style.boxShadow = "0 0 40px 20px rgba(128,0,128,0.9)";
+      effect.style.background = "radial-gradient(rgba(128,0,128,0.6), transparent)";
+      new Audio("sounds/dark_energy.mp3").play();
+    }
+
+    target.appendChild(effect);
+    setTimeout(() => effect.remove(), 1000);
+  }
+
+  // 儲存排行榜分數
+  function saveScore(win, time, role) {
+    let scores = JSON.parse(localStorage.getItem("scores")) || [];
+    scores.push({win: win, time: time, role: role});
+    scores.sort((a,b) => { 
+      if(a.win !== b.win) return b.win - a.win; 
+      return a.time - b.time; 
+    });
+    localStorage.setItem("scores", JSON.stringify(scores.slice(0,5)));
+  }
+
+  // 顯示排行榜
+  function showLeaderboard() {
+    let scores = JSON.parse(localStorage.getItem("scores")) || [];
+    let list = document.getElementById("scores");
+    list.innerHTML = "";
+    scores.forEach((s, i) => {
+      let li = document.createElement("li");
+      let img = document.createElement("img");
+      img.className = "scoreIcon";
+      if(s.role === "炭志郎") img.src = "images/icons/tanjiro_icon.png";
+      else if(s.role === "善溢") img.src = "images/icons/zenitsu_icon.png";
+      else if(s.role === "煉獄杏壽郎") img.src = "images/icons/rengoku_icon.png";
+      else img.src = "images/icons/izanami_icon.png";
+      if(i === 0) li.classList.add("gold");
+      else if(i === 1) li.classList.add("silver");
+      else if(i === 2) li.classList.add("bronze");
+      li.appendChild(img);
+      li.appendChild(document.createTextNode(`${i+1}. ${s.role} - ${s.win ? "勝利" : "失敗"} - 用時: ${s.time}秒`));
+      list.appendChild(li);
+    });
+  }
+
+  // === 數學題目功能 ===
+  function generateQuestion() {
+    let a = Math.floor(Math.random() * 90) + 10; // 二位數
+    let b = Math.floor(Math.random() * 90) + 10; // 二位數
+    let correct = a * b;
+    document.getElementById("questionText").innerText = `${a} × ${b} = ?`;
+    let optionsDiv = document.getElementById("options");
+    optionsDiv.innerHTML = "";
+    let answers = [correct];
+    while(answers.length < 3) {
+      let wrong = correct + (Math.floor(Math.random() * 20) - 10) * 10;
+      if(wrong > 0 && !answers.includes(wrong)) answers.push(wrong);
+    }
+    answers.sort(() => Math.random() - 0.5);
+    answers.forEach(opt => {
+      let btn = document.createElement("button");
+      btn.innerText = opt;
+      btn.onclick = () => checkAnswer(opt, correct);
+      optionsDiv.appendChild(btn);
+    });
+  }
+
+  function checkAnswer(selected, correct) {
+    if(selected === correct) {
+      playerAttack();
+    } else {
+      enemyAttack();
+    }
+    if(playerHP > 0 && enemyHP > 0) {
+      generateQuestion();
+    }
+  }
+</script>
